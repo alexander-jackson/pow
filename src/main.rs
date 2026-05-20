@@ -1,18 +1,13 @@
-mod blob;
-mod crypto;
-mod timelock;
-
-use std::io::{self, Read};
-use std::path::PathBuf;
-
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
 
-use blob::Blob;
-use crypto::{decrypt, derive_key, encrypt, random_salt};
-use timelock::{benchmark, compute_fast, compute_slow, Modulus, MODULUS_BITS};
+mod blob;
+mod command;
+mod crypto;
+mod timelock;
 
 #[derive(Parser)]
 #[command(
@@ -91,111 +86,12 @@ impl FromStr for LockDuration {
     }
 }
 
-fn cmd_lock(time: LockDuration, output: Option<PathBuf>) -> Result<(), String> {
-    let target_secs = time.0;
-
-    let master_password = rpassword::prompt_password("Master password: ")
-        .map_err(|e| e.to_string())?;
-    let account_password = rpassword::prompt_password("Account password to lock: ")
-        .map_err(|e| e.to_string())?;
-    let confirm = rpassword::prompt_password("Confirm account password: ")
-        .map_err(|e| e.to_string())?;
-
-    if account_password != confirm {
-        return Err("Passwords do not match.".into());
-    }
-
-    eprintln!("Generating RSA modulus ({MODULUS_BITS} bits)...");
-    let modulus = Modulus::generate();
-
-    eprintln!("Benchmarking this machine (~3s)...");
-    let squarings_per_sec = benchmark(&modulus.n);
-
-    let t = squarings_per_sec * target_secs;
-    eprintln!(
-        "Time-lock set to {t} squarings  ({squarings_per_sec}/sec × {target_secs}s target)"
-    );
-
-    eprint!("Computing time-lock (fast path)...");
-    let timelock_result = compute_fast(&modulus, t);
-    eprintln!(" done.");
-
-    eprintln!("Deriving key and encrypting...");
-    let argon2_salt = random_salt();
-    let aes_key = derive_key(master_password.as_bytes(), &argon2_salt, &timelock_result)?;
-    let (ciphertext, nonce) = encrypt(&aes_key, account_password.as_bytes());
-
-    let blob = Blob::new(
-        &modulus.n,
-        t,
-        squarings_per_sec,
-        target_secs,
-        &argon2_salt,
-        &nonce,
-        &ciphertext,
-    );
-    let json = blob.to_json();
-
-    match output {
-        Some(ref path) => {
-            std::fs::write(path, &json).map_err(|e| e.to_string())?;
-            eprintln!("Blob written to {}.", path.display());
-        }
-        None => println!("{json}"),
-    }
-
-    Ok(())
-}
-
-fn cmd_unlock(input: Option<PathBuf>) -> Result<(), String> {
-    let json = match input {
-        Some(path) => std::fs::read_to_string(&path).map_err(|e| e.to_string())?,
-        None => {
-            let mut s = String::new();
-            io::stdin()
-                .read_to_string(&mut s)
-                .map_err(|e| e.to_string())?;
-            s
-        }
-    };
-
-    let blob = Blob::from_json(&json)?;
-
-    if blob.version != 1 {
-        return Err(format!("Unsupported blob version {}.", blob.version));
-    }
-
-    let master_password = rpassword::prompt_password("Master password: ")
-        .map_err(|e| e.to_string())?;
-
-    let n = blob.n_bigint()?;
-
-    eprintln!(
-        "Unlocking — performing {} squarings (target: ~{}s).",
-        blob.t, blob.target_secs
-    );
-
-    let timelock_result = compute_slow(&n, blob.t);
-
-    let argon2_salt = blob.argon2_salt_bytes()?;
-    let aes_key = derive_key(master_password.as_bytes(), &argon2_salt, &timelock_result)?;
-
-    let ciphertext = blob.ciphertext_bytes()?;
-    let nonce = blob.nonce_bytes()?;
-    let plaintext = decrypt(&aes_key, &ciphertext, &nonce)?;
-
-    let password = String::from_utf8(plaintext).map_err(|e| e.to_string())?;
-    println!("{password}");
-
-    Ok(())
-}
-
 fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Lock { time, output } => cmd_lock(time, output),
-        Commands::Unlock { input } => cmd_unlock(input),
+        Commands::Lock { time, output } => crate::command::lock::run(time, output),
+        Commands::Unlock { input } => crate::command::unlock::run(input),
     };
 
     if let Err(e) = result {
@@ -210,9 +106,9 @@ mod tests {
 
     use test_case::test_case;
 
-    use crate::crypto::{decrypt, derive_key, encrypt};
-    use crate::timelock::{compute_fast, compute_slow, Modulus};
     use crate::LockDuration;
+    use crate::crypto::{decrypt, derive_key, encrypt};
+    use crate::timelock::{Modulus, compute_fast, compute_slow};
 
     #[test_case("30s",  Some(30)   ; "can_parse_seconds_suffix")]
     #[test_case("5m",   Some(300)  ; "can_parse_minutes_suffix")]

@@ -1,6 +1,6 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
+    aead::{Aead, KeyInit},
 };
 use argon2::{Algorithm, Argon2, Params, Version};
 use hkdf::Hkdf;
@@ -64,7 +64,9 @@ pub fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> (Vec<u8>, [u8; 12]) {
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
     let nonce_bytes = random_nonce();
     let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce, plaintext).expect("AES-GCM encryption failed");
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext)
+        .expect("AES-GCM encryption failed");
     (ciphertext, nonce_bytes)
 }
 
