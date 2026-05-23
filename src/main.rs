@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 mod blob;
 mod command;
 mod crypto;
+mod password;
 mod timelock;
 
 #[derive(Parser)]

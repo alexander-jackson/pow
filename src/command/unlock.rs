@@ -13,9 +13,7 @@ pub fn run(input: PathBuf) -> Result<(), String> {
         return Err(format!("Unsupported blob version {}.", blob.version));
     }
 
-    let master_password =
-        rpassword::prompt_password("Master password: ").map_err(|e| e.to_string())?;
-
+    let master_password = crate::password::read("Master password: ")?;
     let n = blob.n_bigint()?;
 
     eprintln!(

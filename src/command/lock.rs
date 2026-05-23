@@ -8,12 +8,9 @@ use crate::timelock::{MODULUS_BITS, Modulus, benchmark, compute_fast};
 pub fn run(time: LockDuration, output: PathBuf) -> Result<(), String> {
     let target_secs = time.0;
 
-    let master_password =
-        rpassword::prompt_password("Master password: ").map_err(|e| e.to_string())?;
-    let account_password =
-        rpassword::prompt_password("Account password to lock: ").map_err(|e| e.to_string())?;
-    let confirm =
-        rpassword::prompt_password("Confirm account password: ").map_err(|e| e.to_string())?;
+    let master_password = crate::password::read("Master password: ")?;
+    let account_password = crate::password::read("Account password to lock: ")?;
+    let confirm = crate::password::read("Confirm account password: ")?;
 
     if account_password != confirm {
         return Err("Passwords do not match.".into());
