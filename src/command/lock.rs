@@ -5,7 +5,7 @@ use crate::blob::Blob;
 use crate::crypto::{derive_key, encrypt, random_salt};
 use crate::timelock::{MODULUS_BITS, Modulus, benchmark, compute_fast};
 
-pub fn run(time: LockDuration, output: Option<PathBuf>) -> Result<(), String> {
+pub fn run(time: LockDuration, output: PathBuf) -> Result<(), String> {
     let target_secs = time.0;
 
     let master_password =
@@ -48,13 +48,8 @@ pub fn run(time: LockDuration, output: Option<PathBuf>) -> Result<(), String> {
     );
     let json = blob.to_json();
 
-    match output {
-        Some(ref path) => {
-            std::fs::write(path, &json).map_err(|e| e.to_string())?;
-            eprintln!("Blob written to {}.", path.display());
-        }
-        None => println!("{json}"),
-    }
+    std::fs::write(&output, &json).map_err(|e| e.to_string())?;
+    eprintln!("Blob written to {}.", output.display());
 
     Ok(())
 }

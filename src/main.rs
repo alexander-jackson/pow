@@ -37,7 +37,7 @@ enum Commands {
 
         /// Write the blob to FILE instead of stdout.
         #[arg(short, long, value_name = "FILE")]
-        output: Option<PathBuf>,
+        output: PathBuf,
     },
 
     /// Unlock a previously locked password.
@@ -47,7 +47,7 @@ enum Commands {
     Unlock {
         /// Read the blob from FILE instead of stdin.
         #[arg(short, long, value_name = "FILE")]
-        input: Option<PathBuf>,
+        input: PathBuf,
     },
 }
 

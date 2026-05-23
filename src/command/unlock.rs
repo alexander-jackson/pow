@@ -1,23 +1,11 @@
-use std::io::Read;
 use std::path::PathBuf;
 
 use crate::blob::Blob;
 use crate::crypto::{decrypt, derive_key};
 use crate::timelock::compute_slow;
 
-pub fn run(input: Option<PathBuf>) -> Result<(), String> {
-    let json = match input {
-        Some(path) => std::fs::read_to_string(&path).map_err(|e| e.to_string())?,
-        None => {
-            let mut s = String::new();
-
-            std::io::stdin()
-                .read_to_string(&mut s)
-                .map_err(|e| e.to_string())?;
-
-            s
-        }
-    };
+pub fn run(input: PathBuf) -> Result<(), String> {
+    let json = std::fs::read_to_string(&input).map_err(|e| e.to_string())?;
 
     let blob = Blob::from_json(&json)?;
 
