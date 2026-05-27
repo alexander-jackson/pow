@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use arboard::Clipboard;
+
 use crate::blob::Blob;
 use crate::crypto::{decrypt, derive_key};
 use crate::timelock::compute_slow;
@@ -31,7 +33,10 @@ pub fn run(input: PathBuf) -> Result<(), String> {
     let plaintext = decrypt(&aes_key, &ciphertext, &nonce)?;
 
     let password = String::from_utf8(plaintext).map_err(|e| e.to_string())?;
-    println!("{password}");
+
+    let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
+    clipboard.set_text(password).map_err(|e| e.to_string())?;
+    println!("Password copied to clipboard.");
 
     Ok(())
 }

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 aes-gcm = "0.10.3"
+arboard = "3.6.1"
 argon2 = "0.5.3"
 base64 = "0.22.1"
 clap = { version = "4.6.0", features = ["derive"] }
