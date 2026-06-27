@@ -50,6 +50,24 @@ enum Commands {
         #[arg(short, long, value_name = "FILE")]
         input: PathBuf,
     },
+
+    /// Update the time delay on a previously locked password.
+    ///
+    /// Unlocks the existing blob (performing the full sequential work), then
+    /// re-encrypts the same password with a new time delay.
+    Update {
+        /// New duration for unlocking (e.g. 30s, 5m, 1h).
+        #[arg(short, long)]
+        time: LockDuration,
+
+        /// Read the existing blob from FILE.
+        #[arg(short, long, value_name = "FILE")]
+        input: PathBuf,
+
+        /// Write the updated blob to FILE (defaults to --input for in-place update).
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
+    },
 }
 
 /// A duration expressed as a whole number of seconds, parsed from strings like
@@ -93,6 +111,10 @@ fn main() {
     let result = match cli.command {
         Commands::Lock { time, output } => crate::command::lock::run(time, output),
         Commands::Unlock { input } => crate::command::unlock::run(input),
+        Commands::Update { time, input, output } => {
+            let out = output.unwrap_or_else(|| input.clone());
+            crate::command::update::run(time, input, out)
+        }
     };
 
     if let Err(e) = result {

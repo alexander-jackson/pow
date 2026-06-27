@@ -1,13 +1,9 @@
 use std::path::PathBuf;
 
 use crate::LockDuration;
-use crate::blob::Blob;
-use crate::crypto::{derive_key, encrypt, random_salt};
-use crate::timelock::{MODULUS_BITS, Modulus, benchmark, compute_fast};
+use super::common::encrypt_and_write;
 
 pub fn run(time: LockDuration, output: PathBuf) -> Result<(), String> {
-    let target_secs = time.0;
-
     let master_password = crate::password::read("Master password: ")?;
     let account_password = crate::password::read("Account password to lock: ")?;
     let confirm = crate::password::read("Confirm account password: ")?;
@@ -16,37 +12,5 @@ pub fn run(time: LockDuration, output: PathBuf) -> Result<(), String> {
         return Err("Passwords do not match.".into());
     }
 
-    eprintln!("Generating RSA modulus ({MODULUS_BITS} bits)...");
-    let modulus = Modulus::generate();
-
-    eprintln!("Benchmarking this machine (~3s)...");
-    let squarings_per_sec = benchmark(&modulus.n);
-
-    let t = squarings_per_sec * target_secs;
-    eprintln!("Time-lock set to {t} squarings  ({squarings_per_sec}/sec × {target_secs}s target)");
-
-    eprint!("Computing time-lock (fast path)...");
-    let timelock_result = compute_fast(&modulus, t);
-    eprintln!(" done.");
-
-    eprintln!("Deriving key and encrypting...");
-    let argon2_salt = random_salt();
-    let aes_key = derive_key(master_password.as_bytes(), &argon2_salt, &timelock_result)?;
-    let (ciphertext, nonce) = encrypt(&aes_key, account_password.as_bytes());
-
-    let blob = Blob::new(
-        &modulus.n,
-        t,
-        squarings_per_sec,
-        target_secs,
-        &argon2_salt,
-        &nonce,
-        &ciphertext,
-    );
-    let json = blob.to_json();
-
-    std::fs::write(&output, &json).map_err(|e| e.to_string())?;
-    eprintln!("Blob written to {}.", output.display());
-
-    Ok(())
+    encrypt_and_write(&master_password, account_password.as_bytes(), time.0, &output)
 }
